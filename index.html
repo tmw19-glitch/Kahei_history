@@ -1,419 +1,464 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Coins, ShoppingBag, Info, ArrowRight, History, TrendingUp, TrendingDown, BookOpen, AlertTriangle } from 'lucide-react';
-
-const App = () => {
-  const [currentYen, setCurrentYen] = useState(10000);
-  const [selectedEra, setSelectedEra] = useState('edo_early');
-  const [region, setRegion] = useState('edo');
-  const [showEventToast, setShowEventToast] = useState(false);
-  
-  // 時代データ定義（詳細版）
-  const eraData = {
-    nara: {
-      label: '飛鳥・奈良',
-      period: '708年〜',
-      currencyName: '文（もん）',
-      baseRate: 50, // 1文 ≈ 50~100円
-      description: '日本初の流通貨幣「和同開珎」が登場。しかし信用は低く、都（キナイ）以外では米や布が主役。',
-      items: [
-        { name: '米 2kg', price: 10, icon: '🌾' },
-        { name: '塩 1升', price: 2, icon: '🧂' },
-        { name: '布 1反', price: 50, icon: '🧵' },
-        { name: '邸宅の土地', price: 1000, icon: '🏠' },
-      ],
-      column: {
-        title: '蓄銭叙位令のパラドックス',
-        text: '政府は「お金を貯めたら位をあげる」と言いましたが、裏を返せば「そうでもしないと誰も使ってくれなかった」のです。銅不足で銭の質が悪くなると、人々はすぐに使わなくなりました。'
-      }
-    },
-    heian: {
-      label: '平安時代',
-      period: '10世紀〜',
-      currencyName: '米・絹（物品貨幣）',
-      baseRate: 0, // 特殊処理
-      description: '公的な貨幣発行が停止（本朝十二銭の最後「隆平永宝」以降）。経済は「米」と「絹」の交換に戻る。',
-      isCommodityMoney: true, // 物品貨幣フラグ
-      items: [
-        { name: '馬 1頭', price: 500000, display:'米50石', icon: '🐎' },
-        { name: '貴族の装束', price: 200000, display:'絹20疋', icon: '👘' },
-      ],
-      column: {
-        title: '貨幣の消失',
-        text: '「本朝十二銭」の質が悪化しすぎて信用崩壊。人々は腐らない「布」や主食の「米」をお金の代わりにしました。これを物品貨幣といいます。'
-      }
-    },
-    medieval: {
-      label: '鎌倉・室町',
-      period: '12世紀〜',
-      currencyName: '文（渡来銭）',
-      baseRate: 100, // 宋銭・明銭。需要が高く価値がある。
-      description: '中国（宋・明）から大量の銭を輸入。「永楽通宝」などの渡来銭が流通し、経済が活発化。',
-      items: [
-        { name: '太刀（武器）', price: 1000, icon: '⚔️' },
-        { name: '扇子', price: 50, icon: '🪭' },
-        { name: '馬借の運賃', price: 20, icon: '🐴' },
-        { name: '関所の通行料', price: 10, icon: '🚧' },
-      ],
-      column: {
-        title: '撰銭（えりぜに）と撰銭令',
-        text: '割れたりすり減ったりした「ビタ銭（悪銭）」を受け取り拒否する「撰銭」が横行。幕府は「悪銭も一定割合なら混ぜて使え」という理不尽な命令（撰銭令）を出しました。'
-      }
-    },
-    azuchi: {
-      label: '安土桃山',
-      period: '16世紀末',
-      currencyName: '両・石',
-      baseRate: 60000, // 1両(大判)は非常に高価
-      description: '信長・秀吉の時代。金銀の大判が作られたが、恩賞用で庶民には無縁。「石高（米の取れ高）」が基準。',
-      items: [
-        { name: '鉄砲 1丁', price: 10, display: '約10両', icon: '🔫' },
-        { name: '茶器（名物）', price: 1000, display: '一国一城', icon: '🍵' },
-        { name: '南蛮渡来の時計', price: 50, display: '50両', icon: '🕰️' },
-      ],
-      column: {
-        title: '金の茶室と恩賞',
-        text: 'この時代の金貨（天正大判など）は、買い物用ではなく「家来へのご褒美」でした。秀吉がばら撒いた金銀は、派手な桃山文化の象徴です。'
-      }
-    },
-    edo_early: {
-      label: '江戸初期',
-      period: '慶長〜寛永',
-      currencyName: '三貨制度',
-      baseRate: 20, // 1文 = 20円（安定期）
-      // 1両 = 4000文 = 8~10万円
-      description: '家康により三貨制度（金・銀・銭）が確立。貨幣の質も良く、経済が安定していた黄金期。',
-      items: [
-        { name: '米 10kg', price: 500, icon: '🌾' },
-        { name: '酒 1升', price: 200, icon: '🍶' },
-        { name: '飛脚（郵便）', price: 300, icon: '🏃' },
-        { name: '木綿の着物', price: 4000, display: '1両', icon: '👘' },
-      ],
-      column: {
-        title: '慶長小判の信頼',
-        text: '家康が作った「慶長小判」は金の純度が高く（約86%）、世界的に見ても非常に良質な通貨でした。これが江戸260年の平和の基礎となりました。'
-      }
-    },
-    edo_genroku: {
-      label: '江戸中期',
-      period: '元禄〜宝永',
-      currencyName: '三貨（改鋳）',
-      baseRate: 15, // インフレ発生。1文の価値が下がる（=物価が上がる）
-      description: '荻原重秀による「元禄の改鋳」。金の含有量を減らした貨幣を大量発行し、インフレと好景気が到来。',
-      items: [
-        { name: '井原西鶴の本', price: 150, icon: '📖' },
-        { name: '歌舞伎の桟敷席', price: 20000, display:'5両', icon: '🎭' },
-        { name: '高級料亭の食事', price: 4000, display:'1両', icon: '🍱' },
-        { name: '花火の寄付', price: 1000, icon: '🎆' },
-      ],
-      column: {
-        title: '貨幣は国家の道具',
-        text: '勘定吟味役の荻原重秀は「貨幣は国家が定めるもの。瓦（かわら）であっても良い」という名言を残し、管理通貨制度の先駆けとなる考えで幕府財政を黒字にしました。'
-      }
-    },
-    edo_late: {
-      label: '幕末',
-      period: '万延〜慶応',
-      currencyName: '三貨（崩壊）',
-      baseRate: 4, // 超インフレ。1文 = 4~5円
-      description: '開国による金の流出と、政情不安によるハイパーインフレ。「ええじゃないか」の狂乱物価。',
-      items: [
-        { name: '卵 1個', price: 50, icon: '🥚' },
-        { name: 'そば 1杯', price: 200, icon: '🍜' },
-        { name: '錦絵（ニュース）', price: 30, icon: '📰' },
-        { name: '輸入ライフル', price: 200000, display:'50両', icon: '🔫' },
-      ],
-      column: {
-        title: '金流出問題',
-        text: '日本の金銀交換比率（1:5）と海外（1:15）の違いを突かれ、大量の小判が海外へ流出。幕府は対抗して質を極端に落とした「万延小判」を発行し、猛烈なインフレを招きました。'
-      }
-    },
-    meiji_early: {
-      label: '明治初期',
-      period: '〜1880年代',
-      currencyName: '円',
-      baseRate: 1000, // 混乱期。1円の価値がまだ定まらない。
-      description: '藩札や太政官札が乱立。新貨条例で「円」ができるが、西南戦争の戦費調達で不換紙幣が増発されインフレに。',
-      items: [
-        { name: '新聞', price: 0.03, display:'3銭', icon: '📰' },
-        { name: '牛鍋', price: 0.15, display:'15銭', icon: '🥘' },
-        { name: '散髪', price: 0.1, display:'10銭', icon: '💈' },
-      ],
-      column: {
-        title: '不換紙幣の恐怖',
-        text: '金と交換できない紙幣（不換紙幣）を刷りまくった結果、紙幣の価値が暴落。政府は後に「松方財政」で血を流すようなデフレ政策を行い、これを整理しました。'
-      }
-    },
-    meiji_late: {
-      label: '明治後期',
-      period: '日清・日露後',
-      currencyName: '円（金本位）',
-      baseRate: 10000, // 1円 = 1万円（安定）
-      description: '金本位制確立。産業革命が進み、資本主義経済が発展。',
-      items: [
-        { name: 'カレーライス', price: 0.1, display:'10銭', icon: '🍛' },
-        { name: '帝国大学授業料', price: 25, display:'25円', icon: '🎓' },
-        { name: '夏目漱石の本', price: 1, display:'1円', icon: '📚' },
-      ],
-      column: {
-        title: '金本位制への道',
-        text: '日清戦争の賠償金（金）を準備金として、1897年に貨幣法を制定。ついに日本も「金本位制」の仲間入りを果たし、国際的な信用を得ました。'
-      }
-    },
-    taisho: {
-      label: '大正・昭和初期',
-      period: '1910-20年代',
-      currencyName: '円',
-      baseRate: 4000, // WWIバブルで物価上昇
-      description: '大戦景気で「成金」が登場する一方、米騒動なども発生。モダン文化が花開く。',
-      items: [
-        { name: 'キャラメル', price: 0.05, display:'5銭', icon: '🍬' },
-        { name: '喫茶店のコーヒー', price: 0.1, display:'10銭', icon: '☕' },
-        { name: 'タクシー（円タク）', price: 1, display:'1円', icon: '🚕' },
-        { name: 'デパートの洋服', price: 10, display:'10円', icon: '👗' },
-      ],
-      column: {
-        title: '成金とシベリア出兵',
-        text: '第一次世界大戦で日本は輸出で大儲けし「船成金」が続出。しかし急激なインフレで米の値段が上がり、1918年には「米騒動」が起こりました。'
-      }
-    }
-  };
-
-  const calculateConversion = () => {
-    const era = eraData[selectedEra];
-    if (era.isCommodityMoney) return null; // 物品貨幣の場合は計算なし
-
-    let rate = era.baseRate;
-    return currentYen / rate;
-  };
-
-  const formatCurrency = (value) => {
-    if (value === null) return "換算不能";
-    if (selectedEra === 'nara' || selectedEra === 'medieval' || selectedEra === 'edo_genroku' || selectedEra === 'edo_late') {
-       return `${Math.floor(value).toLocaleString()} 文`;
-    }
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本史 歴代物価ナビ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    // 江戸初期の金銀計算
-    if (selectedEra === 'edo_early') {
-      if (region === 'edo') {
-        const ryo = Math.floor(value / 4000);
-        const remainder = value % 4000;
-        const bu = Math.floor(remainder / 1000);
-        const shu = Math.floor((remainder % 1000) / 250);
-        const mon = Math.floor(remainder % 250);
-        let res = [];
-        if(ryo) res.push(`${ryo}両`);
-        if(bu) res.push(`${bu}分`);
-        if(shu) res.push(`${shu}朱`);
-        if(mon || res.length===0) res.push(`${mon}文`);
-        return res.join(' ');
-      } else {
-        const totalMomme = value * 0.015; // 簡易換算
-        const kan = Math.floor(totalMomme / 1000);
-        const momme = Math.floor(totalMomme % 1000);
-        return `${kan ? kan+'貫 ' : ''}${momme}匁`;
-      }
-    }
+    <style>
+        /* Custom scrollbar hiding utility */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-stone-100 font-sans text-stone-800">
+    <div id="root"></div>
 
-    if (selectedEra === 'azuchi') {
-        // 大判・小判ベース（非常に大雑把）
-        const ryo = value; // baseRateが高いため、valueは両単位に近い
-        return `約 ${ryo.toFixed(2)} 両`;
-    }
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-    // 明治以降
-    if (['meiji_early', 'meiji_late', 'taisho'].includes(selectedEra)) {
-      const yen = Math.floor(value);
-      const sen = Math.floor((value * 100) % 100);
-      return `${yen}円 ${sen}銭`;
-    }
+        // --- Icons (Lucide replacements for standalone HTML) ---
+        const Icon = ({ children, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {children}
+            </svg>
+        );
 
-    return `${Math.floor(value)}`;
-  };
+        const HistoryIcon = ({ className }) => (
+            <Icon className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l4 2"/></Icon>
+        );
+        const CoinsIcon = ({ className }) => (
+            <Icon className={className}><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></Icon>
+        );
+        const ShoppingBagIcon = ({ className }) => (
+            <Icon className={className}><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></Icon>
+        );
+        const InfoIcon = ({ className }) => (
+            <Icon className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></Icon>
+        );
+        const TrendingUpIcon = ({ className }) => (
+            <Icon className={className}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></Icon>
+        );
+        const TrendingDownIcon = ({ className }) => (
+            <Icon className={className}><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></Icon>
+        );
+        const AlertTriangleIcon = ({ className }) => (
+            <Icon className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></Icon>
+        );
+        const BookOpenIcon = ({ className }) => (
+            <Icon className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>
+        );
 
-  const convertedValue = calculateConversion();
-
-  return (
-    <div className="min-h-screen bg-stone-100 font-sans text-stone-800 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto">
-        
-        {/* Header */}
-        <header className="mb-8 text-center bg-amber-900 text-amber-50 rounded-2xl p-6 shadow-xl">
-          <h1 className="text-2xl md:text-4xl font-bold mb-2 flex items-center justify-center gap-3">
-            <History className="w-8 h-8 md:w-10 md:h-10" />
-            日本史 貨幣・物価タイムトラベル
-          </h1>
-          <p className="opacity-90">現代の1万円を握りしめて、激動の歴史へ飛び込もう</p>
-        </header>
-
-        {/* Controls */}
-        <div className="bg-white rounded-xl shadow-lg p-4 md:p-6 mb-6 sticky top-0 z-10 border-b-4 border-amber-200">
-          <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <label className="font-bold text-stone-600 whitespace-nowrap">所持金：</label>
-              <div className="relative w-full">
-                <input
-                  type="number"
-                  value={currentYen}
-                  onChange={(e) => setCurrentYen(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="text-xl md:text-2xl font-bold p-2 border-2 border-stone-200 rounded-lg w-full md:w-48 text-right pr-10 focus:outline-none focus:border-amber-500 transition-colors"
-                />
-                <span className="absolute right-3 top-3.5 text-stone-400 font-bold">円</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-               <select 
-                 value={selectedEra}
-                 onChange={(e) => setSelectedEra(e.target.value)}
-                 className="bg-amber-100 font-bold text-amber-900 text-lg p-3 rounded-lg border-2 border-amber-300 focus:outline-none cursor-pointer w-full md:w-auto"
-               >
-                 {Object.entries(eraData).map(([key, data]) => (
-                   <option key={key} value={key}>
-                     {data.label} ({data.period})
-                   </option>
-                 ))}
-               </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          
-          {/* Left: Calculation & Items */}
-          <div className="lg:col-span-2 space-y-6">
+        // --- Main App Component ---
+        const App = () => {
+            const [currentYen, setCurrentYen] = useState(10000);
+            const [selectedEra, setSelectedEra] = useState('edo_early');
+            const [region, setRegion] = useState('edo');
             
-            {/* Currency Card */}
-            <div className="bg-gradient-to-br from-amber-50 to-white rounded-2xl border-2 border-amber-200 p-6 shadow-md relative overflow-hidden transition-all duration-300">
-              <div className="absolute top-0 right-0 p-4 opacity-5">
-                <Coins className="w-40 h-40" />
-              </div>
+            const eraData = {
+                nara: {
+                    label: '飛鳥・奈良',
+                    period: '708年〜',
+                    currencyName: '文（もん）',
+                    baseRate: 50,
+                    description: '日本初の流通貨幣「和同開珎」が登場。しかし信用は低く、都（キナイ）以外では米や布が主役。',
+                    items: [
+                        { name: '米 2kg', price: 10, icon: '🌾' },
+                        { name: '塩 1升', price: 2, icon: '🧂' },
+                        { name: '布 1反', price: 50, icon: '🧵' },
+                        { name: '邸宅の土地', price: 1000, icon: '🏠' },
+                    ],
+                    column: {
+                        title: '蓄銭叙位令のパラドックス',
+                        text: '政府は「お金を貯めたら位をあげる」と言いましたが、裏を返せば「そうでもしないと誰も使ってくれなかった」のです。銅不足で銭の質が悪くなると、人々はすぐに使わなくなりました。'
+                    }
+                },
+                heian: {
+                    label: '平安時代',
+                    period: '10世紀〜',
+                    currencyName: '米・絹（物品貨幣）',
+                    baseRate: 0,
+                    description: '公的な貨幣発行が停止（本朝十二銭の最後「隆平永宝」以降）。経済は「米」と「絹」の交換に戻る。',
+                    isCommodityMoney: true,
+                    items: [
+                        { name: '馬 1頭', price: 500000, display:'米50石', icon: '🐎' },
+                        { name: '貴族の装束', price: 200000, display:'絹20疋', icon: '👘' },
+                    ],
+                    column: {
+                        title: '貨幣の消失',
+                        text: '「本朝十二銭」の質が悪化しすぎて信用崩壊。人々は腐らない「布」や主食の「米」をお金の代わりにしました。これを物品貨幣といいます。'
+                    }
+                },
+                medieval: {
+                    label: '鎌倉・室町',
+                    period: '12世紀〜',
+                    currencyName: '文（渡来銭）',
+                    baseRate: 100,
+                    description: '中国（宋・明）から大量の銭を輸入。「永楽通宝」などの渡来銭が流通し、経済が活発化。',
+                    items: [
+                        { name: '太刀（武器）', price: 1000, icon: '⚔️' },
+                        { name: '扇子', price: 50, icon: '🪭' },
+                        { name: '馬借の運賃', price: 20, icon: '🐴' },
+                        { name: '関所の通行料', price: 10, icon: '🚧' },
+                    ],
+                    column: {
+                        title: '撰銭（えりぜに）と撰銭令',
+                        text: '割れたりすり減ったりした「ビタ銭（悪銭）」を受け取り拒否する「撰銭」が横行。幕府は「悪銭も一定割合なら混ぜて使え」という理不尽な命令（撰銭令）を出しました。'
+                    }
+                },
+                azuchi: {
+                    label: '安土桃山',
+                    period: '16世紀末',
+                    currencyName: '両・石',
+                    baseRate: 60000,
+                    description: '信長・秀吉の時代。金銀の大判が作られたが、恩賞用で庶民には無縁。「石高（米の取れ高）」が基準。',
+                    items: [
+                        { name: '鉄砲 1丁', price: 10, display: '約10両', icon: '🔫' },
+                        { name: '茶器（名物）', price: 1000, display: '一国一城', icon: '🍵' },
+                        { name: '南蛮渡来の時計', price: 50, display: '50両', icon: '🕰️' },
+                    ],
+                    column: {
+                        title: '金の茶室と恩賞',
+                        text: 'この時代の金貨（天正大判など）は、買い物用ではなく「家来へのご褒美」でした。秀吉がばら撒いた金銀は、派手な桃山文化の象徴です。'
+                    }
+                },
+                edo_early: {
+                    label: '江戸初期',
+                    period: '慶長〜寛永',
+                    currencyName: '三貨制度',
+                    baseRate: 20,
+                    description: '家康により三貨制度（金・銀・銭）が確立。貨幣の質も良く、経済が安定していた黄金期。',
+                    items: [
+                        { name: '米 10kg', price: 500, icon: '🌾' },
+                        { name: '酒 1升', price: 200, icon: '🍶' },
+                        { name: '飛脚（郵便）', price: 300, icon: '🏃' },
+                        { name: '木綿の着物', price: 4000, display: '1両', icon: '👘' },
+                    ],
+                    column: {
+                        title: '慶長小判の信頼',
+                        text: '家康が作った「慶長小判」は金の純度が高く（約86%）、世界的に見ても非常に良質な通貨でした。これが江戸260年の平和の基礎となりました。'
+                    }
+                },
+                edo_genroku: {
+                    label: '江戸中期',
+                    period: '元禄〜宝永',
+                    currencyName: '三貨（改鋳）',
+                    baseRate: 15,
+                    description: '荻原重秀による「元禄の改鋳」。金の含有量を減らした貨幣を大量発行し、インフレと好景気が到来。',
+                    items: [
+                        { name: '井原西鶴の本', price: 150, icon: '📖' },
+                        { name: '歌舞伎の桟敷席', price: 20000, display:'5両', icon: '🎭' },
+                        { name: '高級料亭の食事', price: 4000, display:'1両', icon: '🍱' },
+                        { name: '花火の寄付', price: 1000, icon: '🎆' },
+                    ],
+                    column: {
+                        title: '貨幣は国家の道具',
+                        text: '勘定吟味役の荻原重秀は「貨幣は国家が定めるもの。瓦（かわら）であっても良い」という名言を残し、管理通貨制度の先駆けとなる考えで幕府財政を黒字にしました。'
+                    }
+                },
+                edo_late: {
+                    label: '幕末',
+                    period: '万延〜慶応',
+                    currencyName: '三貨（崩壊）',
+                    baseRate: 4,
+                    description: '開国による金の流出と、政情不安によるハイパーインフレ。「ええじゃないか」の狂乱物価。',
+                    items: [
+                        { name: '卵 1個', price: 50, icon: '🥚' },
+                        { name: 'そば 1杯', price: 200, icon: '🍜' },
+                        { name: '錦絵（ニュース）', price: 30, icon: '📰' },
+                        { name: '輸入ライフル', price: 200000, display:'50両', icon: '🔫' },
+                    ],
+                    column: {
+                        title: '金流出問題',
+                        text: '日本の金銀交換比率（1:5）と海外（1:15）の違いを突かれ、大量の小判が海外へ流出。幕府は対抗して質を極端に落とした「万延小判」を発行し、猛烈なインフレを招きました。'
+                    }
+                },
+                meiji_early: {
+                    label: '明治初期',
+                    period: '〜1880年代',
+                    currencyName: '円',
+                    baseRate: 1000,
+                    description: '藩札や太政官札が乱立。新貨条例で「円」ができるが、西南戦争の戦費調達で不換紙幣が増発されインフレに。',
+                    items: [
+                        { name: '新聞', price: 0.03, display:'3銭', icon: '📰' },
+                        { name: '牛鍋', price: 0.15, display:'15銭', icon: '🥘' },
+                        { name: '散髪', price: 0.1, display:'10銭', icon: '💈' },
+                    ],
+                    column: {
+                        title: '不換紙幣の恐怖',
+                        text: '金と交換できない紙幣（不換紙幣）を刷りまくった結果、紙幣の価値が暴落。政府は後に「松方財政」で血を流すようなデフレ政策を行い、これを整理しました。'
+                    }
+                },
+                meiji_late: {
+                    label: '明治後期',
+                    period: '日清・日露後',
+                    currencyName: '円（金本位）',
+                    baseRate: 10000,
+                    description: '金本位制確立。産業革命が進み、資本主義経済が発展。',
+                    items: [
+                        { name: 'カレーライス', price: 0.1, display:'10銭', icon: '🍛' },
+                        { name: '帝国大学授業料', price: 25, display:'25円', icon: '🎓' },
+                        { name: '夏目漱石の本', price: 1, display:'1円', icon: '📚' },
+                    ],
+                    column: {
+                        title: '金本位制への道',
+                        text: '日清戦争の賠償金（金）を準備金として、1897年に貨幣法を制定。ついに日本も「金本位制」の仲間入りを果たし、国際的な信用を得ました。'
+                    }
+                },
+                taisho: {
+                    label: '大正・昭和初期',
+                    period: '1910-20年代',
+                    currencyName: '円',
+                    baseRate: 4000,
+                    description: '大戦景気で「成金」が登場する一方、米騒動なども発生。モダン文化が花開く。',
+                    items: [
+                        { name: 'キャラメル', price: 0.05, display:'5銭', icon: '🍬' },
+                        { name: '喫茶店のコーヒー', price: 0.1, display:'10銭', icon: '☕' },
+                        { name: 'タクシー（円タク）', price: 1, display:'1円', icon: '🚕' },
+                        { name: 'デパートの洋服', price: 10, display:'10円', icon: '👗' },
+                    ],
+                    column: {
+                        title: '成金とシベリア出兵',
+                        text: '第一次世界大戦で日本は輸出で大儲けし「船成金」が続出。しかし急激なインフレで米の値段が上がり、1918年には「米騒動」が起こりました。'
+                    }
+                }
+            };
 
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-amber-900 flex items-center gap-2">
-                    {eraData[selectedEra].label}
-                  </h2>
-                  <p className="text-amber-700 text-sm font-bold mt-1">{eraData[selectedEra].description}</p>
-                </div>
-                {/* Edo Toggle */}
-                {selectedEra === 'edo_early' && (
-                  <div className="flex bg-white rounded-lg border border-amber-200 p-1">
-                    <button onClick={() => setRegion('edo')} className={`px-3 py-1 rounded text-sm font-bold ${region === 'edo' ? 'bg-amber-500 text-white' : 'text-stone-500'}`}>東（金）</button>
-                    <button onClick={() => setRegion('osaka')} className={`px-3 py-1 rounded text-sm font-bold ${region === 'osaka' ? 'bg-stone-500 text-white' : 'text-stone-500'}`}>西（銀）</button>
-                  </div>
-                )}
-              </div>
+            const calculateConversion = () => {
+                const era = eraData[selectedEra];
+                if (era.isCommodityMoney) return null;
 
-              <div className="text-center py-6">
-                <div className="text-sm text-stone-500 mb-1">現在の {currentYen.toLocaleString()} 円は...</div>
-                <div className="text-4xl md:text-5xl font-extrabold text-amber-800 break-words leading-tight">
-                  {eraData[selectedEra].isCommodityMoney ? (
-                     <span className="text-2xl text-stone-500">貨幣価値換算できません<br/>(米や布が通貨代わり)</span>
-                  ) : formatCurrency(convertedValue)}
-                </div>
-              </div>
+                let rate = era.baseRate;
+                return currentYen / rate;
+            };
 
-              {/* Status Tags */}
-              <div className="flex gap-2 mt-4 justify-center">
-                {['edo_genroku', 'edo_late', 'meiji_early', 'taisho'].includes(selectedEra) && (
-                   <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                     <TrendingUp className="w-3 h-3" /> インフレ期
-                   </span>
-                )}
-                {['meiji_late'].includes(selectedEra) && (
-                   <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                     <TrendingDown className="w-3 h-3" /> デフレ・安定期
-                   </span>
-                )}
-                {['medieval'].includes(selectedEra) && (
-                   <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                     <AlertTriangle className="w-3 h-3" /> 撰銭トラブル多発
-                   </span>
-                )}
-              </div>
-            </div>
+            const formatCurrency = (value) => {
+                if (value === null) return "換算不能";
+                if (['nara', 'medieval', 'edo_genroku', 'edo_late'].includes(selectedEra)) {
+                    return `${Math.floor(value).toLocaleString()} 文`;
+                }
+                
+                if (selectedEra === 'edo_early') {
+                    if (region === 'edo') {
+                        const ryo = Math.floor(value / 4000);
+                        const remainder = value % 4000;
+                        const bu = Math.floor(remainder / 1000);
+                        const shu = Math.floor((remainder % 1000) / 250);
+                        const mon = Math.floor(remainder % 250);
+                        let res = [];
+                        if(ryo) res.push(`${ryo}両`);
+                        if(bu) res.push(`${bu}分`);
+                        if(shu) res.push(`${shu}朱`);
+                        if(mon || res.length===0) res.push(`${mon}文`);
+                        return res.join(' ');
+                    } else {
+                        const totalMomme = value * 0.015;
+                        const kan = Math.floor(totalMomme / 1000);
+                        const momme = Math.floor(totalMomme % 1000);
+                        return `${kan ? kan+'貫 ' : ''}${momme}匁`;
+                    }
+                }
 
-            {/* Shopping List */}
-            <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6">
-              <h3 className="font-bold text-stone-700 mb-4 flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-amber-600" />
-                当時の買えるものリスト
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {eraData[selectedEra].items.map((item, idx) => {
-                  let canBuy = 0;
-                  if (!eraData[selectedEra].isCommodityMoney) {
-                      // 簡易計算：item.priceはベースレート換算後の単位（文や銭）に近い値で設定
-                      // ただしAzuchiやMeijiなどは特殊
-                      let itemCostInBase = item.price; // 文 or 銭 or 両
-                      
-                      // 時代ごとの所持金（convertedValue）との比較
-                      // ※簡略化のため、convertedValueと同じ単位系でitemsのpriceを設定している前提
-                      canBuy = Math.floor(convertedValue / item.price);
-                      
-                      // 両単位の修正（Azuchi）
-                      if(selectedEra === 'azuchi') canBuy = Math.floor(currentYen / (eraData.azuchi.baseRate * item.price));
-                  } else {
-                      // 物品貨幣（平安）：円から直接計算
-                      // 馬(50万)
-                      canBuy = Math.floor(currentYen / item.price);
-                  }
+                if (selectedEra === 'azuchi') {
+                    const ryo = value;
+                    return `約 ${ryo.toFixed(2)} 両`;
+                }
 
-                  return (
-                    <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${canBuy > 0 ? 'bg-amber-50 border-amber-200' : 'bg-stone-50 border-stone-100 opacity-60'}`}>
-                       <div className="flex items-center gap-3">
-                         <div className="text-2xl w-10 text-center">{item.icon}</div>
-                         <div>
-                           <div className="font-bold text-stone-800">{item.name}</div>
-                           <div className="text-xs text-stone-500">
-                             参考価格: {item.display || `${item.price}${eraData[selectedEra].currencyName}`}
-                           </div>
-                         </div>
-                       </div>
-                       <div className="text-right">
-                         <div className="text-lg font-bold text-stone-700">
-                           {canBuy > 0 ? canBuy.toLocaleString() : '0'} 
-                           <span className="text-xs font-normal ml-1">個</span>
-                         </div>
-                       </div>
+                if (['meiji_early', 'meiji_late', 'taisho'].includes(selectedEra)) {
+                    const yen = Math.floor(value);
+                    const sen = Math.floor((value * 100) % 100);
+                    return `${yen}円 ${sen}銭`;
+                }
+
+                return `${Math.floor(value)}`;
+            };
+
+            const convertedValue = calculateConversion();
+
+            return (
+                <div className="min-h-screen bg-stone-100 p-4 md:p-8">
+                    <div className="max-w-5xl mx-auto">
+                        {/* Header */}
+                        <header className="mb-8 text-center bg-amber-900 text-amber-50 rounded-2xl p-6 shadow-xl">
+                            <h1 className="text-2xl md:text-4xl font-bold mb-2 flex items-center justify-center gap-3">
+                                <HistoryIcon className="w-8 h-8 md:w-10 md:h-10" />
+                                日本史 貨幣・物価タイムトラベル
+                            </h1>
+                            <p className="opacity-90">現代の1万円を握りしめて、激動の歴史へ飛び込もう</p>
+                        </header>
+
+                        {/* Controls */}
+                        <div className="bg-white rounded-xl shadow-lg p-4 md:p-6 mb-6 sticky top-0 z-10 border-b-4 border-amber-200">
+                            <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <label className="font-bold text-stone-600 whitespace-nowrap">所持金：</label>
+                                    <div className="relative w-full">
+                                        <input
+                                            type="number"
+                                            value={currentYen}
+                                            onChange={(e) => setCurrentYen(Math.max(0, parseInt(e.target.value) || 0))}
+                                            className="text-xl md:text-2xl font-bold p-2 border-2 border-stone-200 rounded-lg w-full md:w-48 text-right pr-10 focus:outline-none focus:border-amber-500 transition-colors"
+                                        />
+                                        <span className="absolute right-3 top-3.5 text-stone-400 font-bold">円</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+                                    <select 
+                                        value={selectedEra}
+                                        onChange={(e) => setSelectedEra(e.target.value)}
+                                        className="bg-amber-100 font-bold text-amber-900 text-lg p-3 rounded-lg border-2 border-amber-300 focus:outline-none cursor-pointer w-full md:w-auto"
+                                    >
+                                        {Object.entries(eraData).map(([key, data]) => (
+                                            <option key={key} value={key}>
+                                                {data.label} ({data.period})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Main Content */}
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Left: Calculation & Items */}
+                            <div className="lg:col-span-2 space-y-6">
+                                {/* Currency Card */}
+                                <div className="bg-gradient-to-br from-amber-50 to-white rounded-2xl border-2 border-amber-200 p-6 shadow-md relative overflow-hidden transition-all duration-300">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5">
+                                        <CoinsIcon className="w-40 h-40" />
+                                    </div>
+
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h2 className="text-2xl font-bold text-amber-900 flex items-center gap-2">
+                                                {eraData[selectedEra].label}
+                                            </h2>
+                                            <p className="text-amber-700 text-sm font-bold mt-1">{eraData[selectedEra].description}</p>
+                                        </div>
+                                        {/* Edo Toggle */}
+                                        {selectedEra === 'edo_early' && (
+                                            <div className="flex bg-white rounded-lg border border-amber-200 p-1">
+                                                <button onClick={() => setRegion('edo')} className={`px-3 py-1 rounded text-sm font-bold ${region === 'edo' ? 'bg-amber-500 text-white' : 'text-stone-500'}`}>東（金）</button>
+                                                <button onClick={() => setRegion('osaka')} className={`px-3 py-1 rounded text-sm font-bold ${region === 'osaka' ? 'bg-stone-500 text-white' : 'text-stone-500'}`}>西（銀）</button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="text-center py-6">
+                                        <div className="text-sm text-stone-500 mb-1">現在の {currentYen.toLocaleString()} 円は...</div>
+                                        <div className="text-4xl md:text-5xl font-extrabold text-amber-800 break-words leading-tight">
+                                            {eraData[selectedEra].isCommodityMoney ? (
+                                                <span className="text-2xl text-stone-500">貨幣価値換算できません<br/>(米や布が通貨代わり)</span>
+                                            ) : formatCurrency(convertedValue)}
+                                        </div>
+                                    </div>
+
+                                    {/* Status Tags */}
+                                    <div className="flex gap-2 mt-4 justify-center">
+                                        {['edo_genroku', 'edo_late', 'meiji_early', 'taisho'].includes(selectedEra) && (
+                                            <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                                <TrendingUpIcon className="w-3 h-3" /> インフレ期
+                                            </span>
+                                        )}
+                                        {['meiji_late'].includes(selectedEra) && (
+                                            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                                <TrendingDownIcon className="w-3 h-3" /> デフレ・安定期
+                                            </span>
+                                        )}
+                                        {['medieval'].includes(selectedEra) && (
+                                            <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                                <AlertTriangleIcon className="w-3 h-3" /> 撰銭トラブル多発
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Shopping List */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6">
+                                    <h3 className="font-bold text-stone-700 mb-4 flex items-center gap-2">
+                                        <ShoppingBagIcon className="w-5 h-5 text-amber-600" />
+                                        当時の買えるものリスト
+                                    </h3>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {eraData[selectedEra].items.map((item, idx) => {
+                                            let canBuy = 0;
+                                            if (!eraData[selectedEra].isCommodityMoney) {
+                                                canBuy = Math.floor(convertedValue / item.price);
+                                                if(selectedEra === 'azuchi') canBuy = Math.floor(currentYen / (eraData.azuchi.baseRate * item.price));
+                                            } else {
+                                                canBuy = Math.floor(currentYen / item.price);
+                                            }
+
+                                            return (
+                                                <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${canBuy > 0 ? 'bg-amber-50 border-amber-200' : 'bg-stone-50 border-stone-100 opacity-60'}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="text-2xl w-10 text-center">{item.icon}</div>
+                                                        <div>
+                                                            <div className="font-bold text-stone-800">{item.name}</div>
+                                                            <div className="text-xs text-stone-500">
+                                                                参考価格: {item.display || `${item.price}${eraData[selectedEra].currencyName}`}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-lg font-bold text-stone-700">
+                                                            {canBuy > 0 ? canBuy.toLocaleString() : '0'} 
+                                                            <span className="text-xs font-normal ml-1">個</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right: History Column */}
+                            <div className="space-y-6">
+                                <div className="bg-stone-800 text-stone-100 rounded-2xl p-6 shadow-xl border-t-4 border-amber-500">
+                                    <div className="flex items-center gap-2 mb-4 text-amber-400">
+                                        <BookOpenIcon className="w-6 h-6" />
+                                        <h3 className="font-bold text-lg">歴史のトレビア</h3>
+                                    </div>
+                                    <h4 className="font-bold text-white text-xl mb-2">{eraData[selectedEra].column.title}</h4>
+                                    <p className="text-stone-300 text-sm leading-relaxed">
+                                        {eraData[selectedEra].column.text}
+                                    </p>
+                                </div>
+
+                                {/* Era Timeline Guide */}
+                                <div className="bg-white rounded-2xl p-6 border border-stone-200">
+                                    <h3 className="font-bold text-stone-700 mb-3 text-sm">時代の流れ</h3>
+                                    <div className="relative pl-4 border-l-2 border-stone-200 space-y-4">
+                                        <div className={`text-sm ${['nara','heian'].includes(selectedEra) ? 'font-bold text-amber-600' : 'text-stone-400'}`}>古代：国産の挫折と物品貨幣</div>
+                                        <div className={`text-sm ${['medieval'].includes(selectedEra) ? 'font-bold text-amber-600' : 'text-stone-400'}`}>中世：渡来銭の流入</div>
+                                        <div className={`text-sm ${selectedEra.includes('edo') || selectedEra === 'azuchi' ? 'font-bold text-amber-600' : 'text-stone-400'}`}>近世：三貨制度の確立と改鋳</div>
+                                        <div className={`text-sm ${selectedEra.includes('meiji') || selectedEra === 'taisho' ? 'font-bold text-amber-600' : 'text-stone-400'}`}>近代：円の統一と金本位制</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+                </div>
+            );
+        };
 
-          {/* Right: History Column */}
-          <div className="space-y-6">
-            <div className="bg-stone-800 text-stone-100 rounded-2xl p-6 shadow-xl border-t-4 border-amber-500">
-              <div className="flex items-center gap-2 mb-4 text-amber-400">
-                <BookOpen className="w-6 h-6" />
-                <h3 className="font-bold text-lg">歴史のトレビア</h3>
-              </div>
-              <h4 className="font-bold text-white text-xl mb-2">{eraData[selectedEra].column.title}</h4>
-              <p className="text-stone-300 text-sm leading-relaxed">
-                {eraData[selectedEra].column.text}
-              </p>
-            </div>
-
-            {/* Era Timeline Guide (Simple) */}
-            <div className="bg-white rounded-2xl p-6 border border-stone-200">
-              <h3 className="font-bold text-stone-700 mb-3 text-sm">時代の流れ</h3>
-              <div className="relative pl-4 border-l-2 border-stone-200 space-y-4">
-                 <div className={`text-sm ${['nara','heian'].includes(selectedEra) ? 'font-bold text-amber-600' : 'text-stone-400'}`}>古代：国産の挫折と物品貨幣</div>
-                 <div className={`text-sm ${['medieval'].includes(selectedEra) ? 'font-bold text-amber-600' : 'text-stone-400'}`}>中世：渡来銭の流入</div>
-                 <div className={`text-sm ${selectedEra.includes('edo') || selectedEra === 'azuchi' ? 'font-bold text-amber-600' : 'text-stone-400'}`}>近世：三貨制度の確立と改鋳</div>
-                 <div className={`text-sm ${selectedEra.includes('meiji') || selectedEra === 'taisho' ? 'font-bold text-amber-600' : 'text-stone-400'}`}>近代：円の統一と金本位制</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default App;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
